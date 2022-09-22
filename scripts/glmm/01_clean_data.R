@@ -12,11 +12,11 @@ library(igraph)
 library(dplyr)
 library(here)
 library(readr)
+library(terra)
 
 # read in data
-all_data <- read_csv("yasmine_west_coast_data.csv")
+all_data <- read_csv("data/raw_data_from_uwin/yasmine_west_coast_data.csv")
 length(unique(all_data$locationAbbr))
-?read_csv
 class(all_data)
 
 # check data
@@ -25,7 +25,7 @@ nrow(all_data)
 unique(all_data$commonName)
 
 # read in detection history data set
-detections <- read_csv("initial_data_yasmine.csv")
+detections <- read_csv("data/raw_data_from_uwin/initial_data_yasmine.csv")
 
 # remove all sites with 0 days running from detection data
 detections <- detections[detections$J != 0, ]
@@ -52,12 +52,11 @@ joined_data <- left_join(counts, all_data, by = "locationID")
 nrow(joined_data)
 length(unique(joined_data$locationAbbr))
 
-View(joined_data)
 
 # now we have counts for each site/season combo 
 
 # let's change UTM to lat long
-library(terra)
+
 
 # first make all of our zones just 10 or 11
 joined_data$utmZone[joined_data$utmZone == "11S"] <- 11
@@ -103,13 +102,21 @@ new_dat$city <- tolower(new_dat$city)
 colnames(new_dat) <- c("Species", "locationID", "city", "season",
                        "count", "Site", "utmEast", "utmNorth",
                        "utmZone", "long", "lat")
+
+
 # now use mason's functions to collapse sites by location 
-source("mason_site_collapse/qaqc_sites.R")
-source("mason_site_collapse/long_to_zone.R")
-source("mason_site_collapse/fix_site_names.R")
+source("scripts/mason_site_collapse_code/qaqc_sites.R")
+source("scripts/mason_site_collapse_code/long_to_zone.R")
+source("scripts/mason_site_collapse_code/fix_site_names.R")
 
 new_dat_1 <- qaqc_sites(x = new_dat, cities="city", sites = "Site",
                         my_coords=c("long","lat"), my_crs=4326)
+
+# this function will tell us what sites need to be merged or removed based
+# on proximity to the next site(s)
+# the "remove" may not be totally accurate for this data set because it is 
+# made to keep the site with more data in an occupancy data set, but 
+# we have counts. for now we will keep these separate 
 
 fix_site_names(new_dat_1)
 
@@ -124,7 +131,7 @@ unique(new_dat$city)
 new_dat$city[new_dat$city == "paca"] <- "mela"
 new_dat$city[new_dat$city == "lbca"] <- "mela"
 
-
+################################################################################
 
 # merge all deer to "Deer"
 new_dat$Species[new_dat$Species == "White-tailed deer"] <- "Deer"
@@ -142,9 +149,10 @@ new_dat$Species[new_dat$Species == "Douglas squirrel"] <- "Squirrel"
 new_dat$Species[new_dat$Species == "Fox squirrel"] <- "Squirrel"
 new_dat$Species[new_dat$Species == "Western gray squirrel"] <- "Squirrel"
 
-unique(new_dat$Species)
+################################################################################
 
+# save data
 
-# separate data set for each species 
+write_csv(new_dat, "data/count_data_fall20-sum21.csv")
 
 
