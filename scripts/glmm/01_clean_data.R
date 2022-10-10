@@ -8,6 +8,7 @@
 # install.packages("_")
 library(data.table)
 library(sf)
+library(sp)
 library(igraph)
 library(dplyr)
 library(here)
@@ -103,8 +104,10 @@ colnames(new_dat) <- c("Species", "locationID", "city", "season",
                        "count", "Site", "utmEast", "utmNorth",
                        "utmZone", "long", "lat")
 
+################################################################################
+## removing/merging sites 
 
-# now use mason's functions to collapse sites by location 
+# use mason's functions to collapse sites by location 
 source("scripts/mason_site_collapse_code/qaqc_sites.R")
 source("scripts/mason_site_collapse_code/long_to_zone.R")
 source("scripts/mason_site_collapse_code/fix_site_names.R")
@@ -120,23 +123,53 @@ new_dat_1 <- qaqc_sites(x = new_dat, cities="city", sites = "Site",
 
 fix_site_names(new_dat_1)
 
-# merge  H01-SPS1 and H01-SPS2; H01-HNP1 and H01-HNP2; H01-CFR2 and H01-CFR1
+# we will also remove sites that don't have enough data in detection data
+# the detection data only includes sites that have been fully tagged for a season
 
-new_dat$Site[new_dat$Site == "H01-SPS2"] <- "H01-SPS1"
-new_dat$Site[new_dat$Site == "H01-HNP2"] <- "H01-HNP1"
-new_dat$Site[new_dat$Site == "H01-CFR2"] <- "H01-CFR2"
+# first see which sites are not present in count data
+sites_det_only <- setdiff(unique(detections$Site),unique(new_dat$Site))
+
+# now see which sites are not present in detection data 
+sites_count_only <- setdiff(unique(new_dat$Site),unique(detections$Site))
+
+# manually decide which sites to remove from count data after comparing 
+
+# merge  H01-SPS1 and H01-SPS2; H01-HNP1 and H01-HNP2; H01-CFR2 and H01-CFR1
+# this is based on the fix_site_names function after cross-checking detections
+
+new_dat$Site[new_dat$Site == "H01-SPS2"] <- "H01-SPS1" # keep
+new_dat$Site[new_dat$Site == "H01-HNP2"] <- "H01-HNP1" # keep
+
+# remove all sites that don't exist in detection dataset 
+
+
+
+# now remove all seasons of a site that don't exist in detection data set 
+
+
+
+
+
+
+
+
 
 # merge pasadena and long beach data sets
-unique(new_dat$city)
-new_dat$city[new_dat$city == "paca"] <- "mela"
-new_dat$city[new_dat$city == "lbca"] <- "mela"
+# skipping this for now but keeping in code just in case
+# unique(new_dat$city)
+# new_dat$city[new_dat$city == "paca"] <- "mela"
+# new_dat$city[new_dat$city == "lbca"] <- "mela"
 
+################################################################################
+
+
+View(detections)
+View(new_dat)
 ################################################################################
 
 # merge all deer to "Deer"
 new_dat$Species[new_dat$Species == "White-tailed deer"] <- "Deer"
 new_dat$Species[new_dat$Species == "Mule deer"] <- "Deer"
-
 
 # merge all rabbit to "Rabbit"
 new_dat$Species[new_dat$Species == "Eastern cottontail rabbit"] <- "Rabbit"
@@ -144,10 +177,11 @@ new_dat$Species[new_dat$Species == "Desert cottontail rabbit"] <- "Rabbit"
 new_dat$Species[new_dat$Species == "Rabbit (cannot ID)"] <- "Rabbit"
 
 # merge all squirrel to "Squirrel"
-new_dat$Species[new_dat$Species == "California Ground Squirrel"] <- "Squirrel"
-new_dat$Species[new_dat$Species == "Douglas squirrel"] <- "Squirrel"
-new_dat$Species[new_dat$Species == "Fox squirrel"] <- "Squirrel"
-new_dat$Species[new_dat$Species == "Western gray squirrel"] <- "Squirrel"
+# going to keep separate squirrel spp for now 
+# new_dat$Species[new_dat$Species == "California Ground Squirrel"] <- "Squirrel"
+# new_dat$Species[new_dat$Species == "Douglas squirrel"] <- "Squirrel"
+# new_dat$Species[new_dat$Species == "Fox squirrel"] <- "Squirrel"
+# new_dat$Species[new_dat$Species == "Western gray squirrel"] <- "Squirrel"
 
 ################################################################################
 

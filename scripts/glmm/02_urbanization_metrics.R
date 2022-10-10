@@ -60,7 +60,8 @@ points_SF <- st_as_sf(data_10_SF, coords = c("utmEast", "utmNorth"), crs =
 points_LA <- st_as_sf(data_LA, coords = c("utmEast", "utmNorth"), crs = 
                         32611)
 
-
+mapview(points_LA)
+?mapview
 
 # check that the points look ok
 mapview(points_WA)
@@ -335,3 +336,5 @@ env_data <- rbind(waenv,calenv)
 
 ################################################################################
 # merging everything 
+
+# need to base on location of camera trap
