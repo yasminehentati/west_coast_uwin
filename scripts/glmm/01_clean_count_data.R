@@ -146,12 +146,17 @@ new_dat$Site[new_dat$Site == "H01-HNP2"] <- "H01-HNP1" # keep
 
 # now remove all seasons of a site that don't exist in detection data set 
 
+# take closer look at detection data set 
+uniquesiteseason <- unique(detections[c("Site", "Season")])
+uniques <- arrange(uniquesiteseason, Site, Season)
+table(uniquesiteseason$Site)
+# only 3 seasons actually have data 
+# a lot of sites only have 1 season 
 
-
-
-
-
-
+# same with counts 
+uniquesiteseason2 <- unique(new_dat[c("Site", "season")])
+table(uniquesiteseason2$Site)
+# anywhere from 1-5 seasons of data 
 
 
 # merge pasadena and long beach data sets
