@@ -142,22 +142,34 @@ new_dat$Site[new_dat$Site == "H01-HNP2"] <- "H01-HNP1" # keep
 
 # remove all sites that don't exist in detection dataset 
 
-
-
+new_dat_cut <- subset(new_dat, Site!="KP" & Site!="H9" & Site != "P-MCP"
+                      & Site != "H01-ARB1" & Site != "H01-GAT4"
+                      & Site != "H01-CFR2" & Site != "H01-AST1" & Site != "H01-LTC1"
+                      & Site != "ED08" & Site != "PCNYN02" & Site != "H01-TCR1"
+                      & Site != "ED02" & Site != "PCNYN01" & Site != "LCW01"
+                      & Site != "LCW02" & Site != "H01-GSC1" & Site != "H01-GSC2"
+                      & Site !=  "H01-ROS2" & Site != "H01-SPS2" & Site != "H01-ELY1"
+                      & Site != "H01-BGC1" & Site != "ED03" & Site != "H01-CFR1"
+                      & Site != "H01-WTP2" & Site != "H01-HNP2" & Site != "LWNT02"
+                      & Site != "LWNT01" & Site != "H01-SAB1" & Site != "CHG"
+                      & Site != "GKSK" & Site != "UPWE")
+new_dat_cut
+new_dat
 # now remove all seasons of a site that don't exist in detection data set 
 
 # take closer look at detection data set 
 uniquesiteseason <- unique(detections[c("Site", "Season")])
 uniques <- arrange(uniquesiteseason, Site, Season)
 table(uniquesiteseason$Site)
-# only 3 seasons actually have data 
-# a lot of sites only have 1 season 
 
 # same with counts 
-uniquesiteseason2 <- unique(new_dat[c("Site", "season")])
+uniquesiteseason2 <- unique(new_dat_cut[c("Site", "season")])
 table(uniquesiteseason2$Site)
-# anywhere from 1-5 seasons of data 
 
+# let's remove oct 21 since it doesn't exist in detections data and is probably
+# incomplete 
+
+new_dat <- subset(new_dat_cut, season != "OC21")
 
 # merge pasadena and long beach data sets
 # skipping this for now but keeping in code just in case
@@ -165,11 +177,6 @@ table(uniquesiteseason2$Site)
 # new_dat$city[new_dat$city == "paca"] <- "mela"
 # new_dat$city[new_dat$city == "lbca"] <- "mela"
 
-################################################################################
-
-
-View(detections)
-View(new_dat)
 ################################################################################
 
 # merge all deer to "Deer"
