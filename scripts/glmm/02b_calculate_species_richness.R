@@ -10,25 +10,29 @@ library(here)
 library(tidyverse)
 library(vegan)
 
-# read in detection data
+# read in count data
 counts <- read_csv("data/count_data_fall20-sum21.csv")
+
 
 # add together all occurrences of each spp per site 
 counts_sum <- counts %>% group_by(Species, Site, season) %>% summarise(ySum = sum(count))
 
 # pivot into wide format 
-# wide_counts <- counts_sum %>% pivot_wider(names_from = "Species", values_from = "ySum")
+wide_counts <- counts_sum %>% pivot_wider(names_from = "Species", values_from = "ySum")
+wide_counts
 
 # replace all NAs with 0s
-# wide_counts %>% mutate_all(~replace(., is.na(.), 0))
-
-
-
+wide_counts <- wide_counts %>% mutate_all(~replace(., is.na(.), 0))
+wide_counts
 # now add in sites that have 0 observations of anything and SR of 0 
 # going to use detection data to do this 
 
 # read in detection history data set
 detections <- read_csv("data/raw_data_from_uwin/initial_data_yasmine.csv")
+
+# remove all rows where J is 0 
+detections <- detections[detections$J != 0, ]
+(unique(detections$Site))
 
 # summarize Ys for each site 
 
@@ -39,48 +43,90 @@ det_1 <- detections %>% group_by(Site, Season) %>% summarize(ySum = sum(Y))
 
 det_0 <- det_1 %>% subset(ySum == 0)
 
-# now we have all site/season combos where nothing was detected 
-intersect(det_0$Site, counts_sum$site)
+colnames(det_0) <- c("Site", "season", "ySum")
+
+# make det_0 look like wide_counts by adding columns 
+det_0 <- det_0 %>% select(-ySum) %>% add_column("Black bear" = 0, "Bobcat" = 0, "Brush Rabbit" = 0,
+                    "California Ground Squirrel" = 0, "Coyote" = 0, "Deer" = 0,
+                    "Domestic cat" = 0, "Domestic dog" = 0, "Douglas squirrel" = 0, 
+                    "Eastern gray squirrel" = 0, "Elk" = 0, "Fox squirrel" = 0, 
+                    "Gray fox" = 0, "Mountain lion" = 0, "Rabbit" = 0,"Raccoon" = 0, 
+                    "Red fox" = 0, "Stoat" = 0, "Striped Skunk" = 0, "Virginia opossum" = 0,
+                    "Weasel (cannot ID)" = 0, "Western Chipmunks" = 0, "Western gray squirrel" = 0)
+
 
 # now we need to add a new row to the richness data
 # for each site that already exists but had no detections in a season
 
+# bind both dfs 
+counts_all <- rbind(wide_counts, det_0)
 
+# keep first unique site/season combo
+counts_all <- counts_all %>% distinct(Site, season, .keep_all = TRUE)
 
+# merge sites that are the same site with diff code
+counts_all$Site[counts_all$Site == "H01-FIR1"] <- "H01-FIR2" # keep
 
+# pivot back to long format 
+counts_long <- pivot_longer(counts_all, cols = 3:25, names_to = "Species")
 
+################################################################################
 
+# add metadata - some new sites from detections so need to bind those 
+counts_meta <- counts %>% select(-c("Species", "season", "locationID", "count", "utmEast",
+                                    "utmNorth", "utmZone"))
+det_meta <- detections %>% select(-c("Species", "Season", "Crs", "Y", "J"))
 
+# give same column names 
+colnames(counts_meta) <- c("City", "Site", "Long", "Lat")
 
+# bind together 
+metadata <- rbind(counts_meta, det_meta)
+metadata <- metadata %>% distinct(Site, .keep_all = TRUE)
 
+# change "mela" to "paca" or "lbca" 
+metadata[76,1] = "paca"
+metadata$City[metadata$City == "mela"] <- "lbca"
 
+# merge metadata with long count data
+counts_long <- counts_long %>% left_join(metadata, by = "Site")
 
+counts_long
 
 # get richness for each site/season
-plr<-counts_sum %>%
-  group_by(locationID, season) %>%
+sr<-counts_sum %>%
+    group_by(Site, season) %>%
   summarise(species.richness=n()) %>%
   arrange(-species.richness)
 
 
 # average richness across seasons for each site 
 # skipping this for now because our sites have different amounts of seasons 
-# plr_avg <- plr %>% group_by(Site) %>% summarise(avg_richness = mean(species.richness))
-
-## merge with other site data 
-
-# change counts data to only have 1 row per site and remove variables we don't care about
-
-counts_new <- counts %>% select(-c(Species, count, season)) %>% distinct(locationID, .keep_all=TRUE)
-
-# merge site metadata with richness
-spp_rich_dat<- plr %>% left_join(counts_new)
-spp_rich_dat
-
-
+plr_avg <- plr %>% group_by(Site) %>% summarise(avg_richness = mean(species.richness))
+hist(plr_avg$avg_richness)
 
 # save as csv
-write_csv(spp_rich_dat, "data/avg_spp_rich_fall20-sum21.csv")
+write_csv(sr, "data/spp_rich_fall20-sum21.csv")
 
 
+################################################################################
 
+# calculating diversity 
+# pivot back to wide 
+# counts_wide_new <- counts_long %>% pivot_wider(names_from = "Species", values_from = "value")
+# counts_wide_new
+
+div <- counts_long %>%
+  group_by(Site, season) %>%
+  filter(value>0) %>%
+  summarise(N=sum(value),
+            shannon.di=-sum((value/sum(value))*log(value/sum(value))),
+            simpson.di=1-sum((value/sum(value))^2),
+            inv.simpson.di=1/sum((value/sum(value))^2)) %>%
+  arrange(-shannon.di)
+
+# merge with metadata
+div <- div %>% left_join(metadata, by = "Site")
+
+# save as csv
+write_csv(div, "data/diversity-fall20-sum21.csv")
