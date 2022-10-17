@@ -60,22 +60,22 @@ points_SF <- st_as_sf(data_10_SF, coords = c("utmEast", "utmNorth"), crs =
 points_LA <- st_as_sf(data_LA, coords = c("utmEast", "utmNorth"), crs = 
                         32611)
 
-mapview(points_LA)
-?mapview
+# mapview(points_LA)
+
 
 # check that the points look ok
-mapview(points_WA)
-mapview(points_SF)
-mapview(points_LA)
+# mapview(points_WA)
+# mapview(points_SF)
+# mapview(points_LA)
 
 
 ################################################################################
 ## INCOME DATA
 ## median household income data from American Community Survey
 
-Sys.getenv("CENSUS_API_KEY")
+# Sys.getenv("CENSUS_API_KEY")
 # load census API key
-census_api_key("e649b78a1d98fe7e1c9ff7039840781976777eb6",
+# census_api_key("e649b78a1d98fe7e1c9ff7039840781976777eb6",
                install = TRUE)
 
 # load in ACS variables  from 2019 
@@ -109,17 +109,17 @@ suggest_top_crs(tractincomeWA) # 32148 is projected CRS
 tractsKP <- tractincomeWA %>% dplyr::filter(substr(GEOID, 1, 5) 
                                             %in% c("53033", "53053"))
 
-mapview(tractsKP) # looks good
+# mapview(tractsKP) # looks good
 
 # write king and pierce county shapefiles 
-st_write(tractsKP, here("data", "income_maps", "seatac_med_income.shp"))
+# st_write(tractsKP, here("data", "income_maps", "seatac_med_income.shp"))
 
 # crop to actual study area 
 tractsKP <- st_transform(tractsKP, crs=4326)
 tractsKP_crop <- st_crop(tractsKP, c(xmin= -121.7, ymin = 46.7, xmax = -122.8, ymax = 47.8))
 
 # write shapefiles for cropped area 
-st_write(tractsKP_crop, here("data", "income_maps", "seatac_urban_med_income.shp"))
+# st_write(tractsKP_crop, here("data", "income_maps", "seatac_urban_med_income.shp"))
 
 
 # do the same for the bay area
@@ -132,19 +132,19 @@ tractsSF <- tractincomeCA %>% dplyr::filter(substr(GEOID, 1, 5)
                                                    "06001", "06075",
                                                    "06081", "06085"))
 
-mapview(tractsSF)
+# mapview(tractsSF)
 
 # write SF bay area  shapefiles 
-st_write(tractsSF, here("data", "income_maps", "sf_bay_med_income.shp"))
+# st_write(tractsSF, here("data", "income_maps", "sf_bay_med_income.shp"))
 
 # do the same for LA
 # just LA county 
 tractsLA <- tractincomeCA %>% dplyr::filter(substr(GEOID, 1, 5) 
                                             %in% c("06037"))
 
-mapview(tractsLA)
+# mapview(tractsLA)
 # write LA area shapefiles 
-st_write(tractsLA, here("data", "income_maps", "la_county_med_income.shp"))
+# st_write(tractsLA, here("data", "income_maps", "la_county_med_income.shp"))
 
 
 
@@ -172,7 +172,7 @@ sf_use_s2(FALSE)
 wa_housing <- st_transform(wa_housing, crs=4326)
 wa_housing <- st_crop(wa_housing, c(xmin= -121.7, ymin = 46.7, xmax = -122.8, ymax = 47.8))
 
-mapview(wa_housing)
+# mapview(wa_housing)
 
 
 
@@ -192,9 +192,9 @@ wa_housing <- wa_housing %>% dplyr::select(BLK10, WATER10, POP10,
                                            HU10, HUDEN10, HHUDEN10,
                                            PUBFLAG:geometry)
 colnames(wa_housing)
-mapview(wa_housing)
+# mapview(wa_housing)
 
-st_write(wa_housing, here("data", "housing_maps", "kp_urban_huden_2010.shp"))
+# st_write(wa_housing, here("data", "housing_maps", "kp_urban_huden_2010.shp"))
 
 
 ################################################################################
@@ -202,7 +202,7 @@ st_write(wa_housing, here("data", "housing_maps", "kp_urban_huden_2010.shp"))
 
 # load LandSat NDVI raster from GRC GEE code 
 
-ndvi_kp <- raster(here("data", "NDVI_data", "NDVI2020_KP_urban.TIF"))
+ndvi_kp <- raster(here("data", "NDVI_data", "NDVI2020_tawa_test.TIF"))
 
 
 # reproject points to raster crs 
@@ -226,7 +226,7 @@ prop_ndvi_greater0.2 <- lapply(ndvi_extract, function (x){
 prop_veg <- do.call(c, prop_ndvi_greater0.2)
 prop_veg
 
-
+# for SF
 
 # extract the proportion of the buffer that has an NDVI greater than 0.2 (vegetation cover)
 # this returns a list, so we can use lapply to calculate the proportion for each site
@@ -338,3 +338,7 @@ env_data <- rbind(waenv,calenv)
 # merging everything 
 
 # need to base on location of camera trap
+
+
+################################################################################
+# pca 

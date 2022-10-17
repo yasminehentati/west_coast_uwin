@@ -1,7 +1,8 @@
 ################################################################################
-################# West Coast Env Health GLMM Analysis ##########################
-################# Step 2B: Calculate Species Richness ##########################
-#################   Yasmine Hentati yhentati@uw.edu   ##########################
+################# West Coast Env Health GLMM Analysis  #########################
+################# Step 2B: Calculate Species Richness, #########################
+#################     Diversity, & Abundance           #########################
+#################   Yasmine Hentati yhentati@uw.edu    #########################
 ################################################################################
 
 # packages
@@ -13,9 +14,9 @@ library(vegan)
 # read in count data
 counts <- read_csv("data/count_data_fall20-sum21.csv")
 
-
 # add together all occurrences of each spp per site 
 counts_sum <- counts %>% group_by(Species, Site, season) %>% summarise(ySum = sum(count))
+counts_sum
 
 # pivot into wide format 
 wide_counts <- counts_sum %>% pivot_wider(names_from = "Species", values_from = "ySum")
@@ -24,6 +25,7 @@ wide_counts
 # replace all NAs with 0s
 wide_counts <- wide_counts %>% mutate_all(~replace(., is.na(.), 0))
 wide_counts
+
 # now add in sites that have 0 observations of anything and SR of 0 
 # going to use detection data to do this 
 
@@ -55,7 +57,7 @@ det_0 <- det_0 %>% select(-ySum) %>% add_column("Black bear" = 0, "Bobcat" = 0, 
                     "Weasel (cannot ID)" = 0, "Western Chipmunks" = 0, "Western gray squirrel" = 0)
 
 
-# now we need to add a new row to the richness data
+# now we need to add a new row to the data
 # for each site that already exists but had no detections in a season
 
 # bind both dfs 
@@ -106,15 +108,13 @@ plr_avg <- plr %>% group_by(Site) %>% summarise(avg_richness = mean(species.rich
 hist(plr_avg$avg_richness)
 
 # save as csv
-write_csv(sr, "data/spp_rich_fall20-sum21.csv")
+# write_csv(sr, "data/spp_rich_fall20-sum21.csv")
 
 
 ################################################################################
 
-# calculating diversity 
-# pivot back to wide 
-# counts_wide_new <- counts_long %>% pivot_wider(names_from = "Species", values_from = "value")
-# counts_wide_new
+## calculating diversity 
+
 
 div <- counts_long %>%
   group_by(Site, season) %>%
@@ -129,4 +129,43 @@ div <- counts_long %>%
 div <- div %>% left_join(metadata, by = "Site")
 
 # save as csv
-write_csv(div, "data/diversity-fall20-sum21.csv")
+# write_csv(div, "data/diversity-fall20-sum21.csv")
+
+
+################################################################################
+## get species abundance data sets 
+# going to use counts_all from before
+
+colnames(counts_all)
+
+# pivot back to long format 
+counts_long <- pivot_longer(counts_all, cols = 3:25, names_to = "Species")
+
+# add metadata - some new sites from detections so need to bind those 
+counts_meta <- counts %>% dplyr::select(-c("Species", "season", "locationID", "count", "utmEast",
+                                    "utmNorth", "utmZone"))
+det_meta <- detections %>% dplyr::select(-c("Species", "Season", "Crs", "Y", "J"))
+
+# give same column names 
+colnames(counts_meta) <- c("City", "Site", "Long", "Lat")
+
+# bind together 
+metadata <- rbind(counts_meta, det_meta)
+metadata <- metadata %>% distinct(Site, .keep_all = TRUE)
+
+# change "mela" to "paca" or "lbca" 
+metadata[76,1] = "paca"
+metadata$City[metadata$City == "mela"] <- "lbca"
+
+# merge metadata with long count data
+counts_long <- counts_long %>% left_join(metadata, by = "Site")
+
+
+# pivot back to wide 
+counts_wide_all <- counts_long %>% pivot_wider(names_from = "Species", 
+                                               values_from = "value") %>%
+  dplyr::select(-ySum)
+counts_wide_all
+
+# create csv 
+# typing in a comment :) 

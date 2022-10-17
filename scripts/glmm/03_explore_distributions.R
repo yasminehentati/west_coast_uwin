@@ -1,4 +1,7 @@
-
+################################################################################
+################# West Coast Env Health GLMM Analysis ##########################
+#################      Step 3: Explore Data      ###############################
+################################################################################
 
 
 # packages
@@ -88,5 +91,3 @@ gamma <- fitdistr(data$shannon.di.t, "gamma")
 qqp(data$shannon.di.t, "gamma", shape = gamma$estimate[[1]], rate = gamma$estimate[[2]])
 
 ?qqp
-
-mod <-lmer(yield ~irrigation*density*fertilizer +(1|block/irrigation/density), data=crops)
