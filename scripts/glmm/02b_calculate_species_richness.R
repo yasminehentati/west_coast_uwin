@@ -14,12 +14,13 @@ library(vegan)
 # read in count data
 counts <- read_csv("data/count_data_fall20-sum21.csv")
 
-# add together all occurrences of each spp per site 
+# add together all occurrences of each spp per site (for grouped spp) 
 counts_sum <- counts %>% group_by(Species, Site, season) %>% summarise(ySum = sum(count))
 counts_sum
 
+
 # pivot into wide format 
-wide_counts <- counts_sum %>% pivot_wider(names_from = "Species", values_from = "ySum")
+wide_counts <- counts %>% pivot_wider(names_from = "Species", values_from = "count")
 wide_counts
 
 # replace all NAs with 0s
@@ -48,7 +49,7 @@ det_0 <- det_1 %>% subset(ySum == 0)
 colnames(det_0) <- c("Site", "season", "ySum")
 
 # make det_0 look like wide_counts by adding columns 
-det_0 <- det_0 %>% select(-ySum) %>% add_column("Black bear" = 0, "Bobcat" = 0, "Brush Rabbit" = 0,
+det_0 <- det_0 %>% dplyr::select(-ySum) %>% add_column("Black bear" = 0, "Bobcat" = 0, "Brush Rabbit" = 0,
                     "California Ground Squirrel" = 0, "Coyote" = 0, "Deer" = 0,
                     "Domestic cat" = 0, "Domestic dog" = 0, "Douglas squirrel" = 0, 
                     "Eastern gray squirrel" = 0, "Elk" = 0, "Fox squirrel" = 0, 
@@ -75,9 +76,9 @@ counts_long <- pivot_longer(counts_all, cols = 3:25, names_to = "Species")
 ################################################################################
 
 # add metadata - some new sites from detections so need to bind those 
-counts_meta <- counts %>% select(-c("Species", "season", "locationID", "count", "utmEast",
+counts_meta <- counts %>% dplyr::select(-c("Species", "season", "locationID", "count", "utmEast",
                                     "utmNorth", "utmZone"))
-det_meta <- detections %>% select(-c("Species", "Season", "Crs", "Y", "J"))
+det_meta <- detections %>% dplyr::select(-c("Species", "Season", "Crs", "Y", "J"))
 
 # give same column names 
 colnames(counts_meta) <- c("City", "Site", "Long", "Lat")
@@ -93,10 +94,11 @@ metadata$City[metadata$City == "mela"] <- "lbca"
 # merge metadata with long count data
 counts_long <- counts_long %>% left_join(metadata, by = "Site")
 
-counts_long
+## stuck - need to figure out how to remove 0 rows while keeping those sites 
+# if 0 for all
 
 # get richness for each site/season
-sr<-counts_sum %>%
+sr<- counts_long %>%
     group_by(Site, season) %>%
   summarise(species.richness=n()) %>%
   arrange(-species.richness)
@@ -104,11 +106,11 @@ sr<-counts_sum %>%
 
 # average richness across seasons for each site 
 # skipping this for now because our sites have different amounts of seasons 
-plr_avg <- plr %>% group_by(Site) %>% summarise(avg_richness = mean(species.richness))
-hist(plr_avg$avg_richness)
+# plr_avg <- plr %>% group_by(Site) %>% summarise(avg_richness = mean(species.richness))
+# hist(plr_avg$avg_richness)
 
 # save as csv
-# write_csv(sr, "data/spp_rich_fall20-sum21.csv")
+write_csv(sr, "data/spp_rich_fall20-sum21.csv")
 
 
 ################################################################################
@@ -160,12 +162,13 @@ metadata$City[metadata$City == "mela"] <- "lbca"
 # merge metadata with long count data
 counts_long <- counts_long %>% left_join(metadata, by = "Site")
 
-
+counts_long$City
 # pivot back to wide 
 counts_wide_all <- counts_long %>% pivot_wider(names_from = "Species", 
-                                               values_from = "value") %>%
-  dplyr::select(-ySum)
-counts_wide_all
+                                               values_from = "value")
+colnames(counts_wide_all)
 
-# create csv 
+# create csv
+write_csv(counts_wide_all, here("data", "counts_cleaned.csv"))
+write_csv(counts_long, here("data", "counts_cleaned_long.csv"))
 # typing in a comment :) 

@@ -45,7 +45,7 @@ colnames(counts)
 
 # take site info
 all_data <- all_data %>%
-  select(locationID, locationAbbr, utmEast, utmNorth, utmZone) %>% distinct()
+  dplyr::select(locationID, locationAbbr, utmEast, utmNorth, utmZone) %>% distinct()
 head(all_data)
 
 # join counts to site data 
@@ -53,7 +53,7 @@ joined_data <- left_join(counts, all_data, by = "locationID")
 nrow(joined_data)
 length(unique(joined_data$locationAbbr))
 
-
+joined_data
 # now we have counts for each site/season combo 
 
 # let's change UTM to lat long

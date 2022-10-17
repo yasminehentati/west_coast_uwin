@@ -27,7 +27,7 @@ library(tidyr)
 ################################################################################
 ## notes on projections: we're going to use WGS84/UTM because we need to work in 
 ## meters for our buffers. however, the data is split across 2 zones (11N and 10N)
-## so all steps will need to be done twice - once for 
+## so all steps will need to be done twice - once for each zone 
 ################################################################################
 ## CAMERA LOCATIONS 
 ## get camera points 
@@ -35,48 +35,89 @@ library(tidyr)
 
 
 # load all sites
-all_sites <- read.csv(here("data", "count_data_fall20-sum21.csv"), stringsAsFactors = FALSE)
+all_sites <- read.csv(here("data", "counts_cleaned.csv"), stringsAsFactors = FALSE)
 
 # order data by Location Name 
-all_sites <- all_sites[order(all_sites$locationID),]
+all_sites <- all_sites[order(all_sites$Site),]
 nrow(all_sites)
 
-# subset by UTM zone 
-data_10_WA <- all_sites %>% subset(utmZone == "10" & city == "tawa")
+# split by zone
 
-data_10_SF <- all_sites %>% subset(utmZone == "10" & city == "oaca")
+# create new column for utm zone 
+data_10_WA <- all_sites %>% subset(City == "tawa")
+data_10_WA$utmZone <- "10"
 
-data_LA <- all_sites %>% subset(utmZone == "11")
+data_10_SF <- all_sites %>% subset(City == "oaca")
+data_10_SF$utmZone <- "10"
 
+data_LA <- all_sites %>% subset(City == "paca" | City == "lbca")
+data_LA$utmZone <- "11"
 
+# transform into UTM - WA
+utm1 <- data.frame(x=data_10_WA$Long, y=data_10_WA$Lat) 
+coordinates(utm1) <- ~x+y 
+proj4string(utm1) <- CRS("+proj=longlat +datum=WGS84") 
+utm2 <- spTransform(utm1,CRS("+init=epsg:32610"))
+
+data_10_WA$utmEast <- utm2$x
+data_10_WA$utmNorth <- utm2$y
+
+# transform into UTM - SF
+utm1 <- data.frame(x=data_10_SF$Long, y=data_10_SF$Lat) 
+coordinates(utm1) <- ~x+y 
+proj4string(utm1) <- CRS("+proj=longlat +datum=WGS84") 
+utm2 <- spTransform(utm1,CRS("+init=epsg:32610"))
+
+data_10_SF$utmEast <- utm2$x
+data_10_SF$utmNorth <- utm2$y
+
+# transform into UTM - LA
+utm1 <- data.frame(x=data_LA$Long, y=data_LA$Lat) 
+coordinates(utm1) <- ~x+y 
+proj4string(utm1) <- CRS("+proj=longlat +datum=WGS84") 
+utm2 <- spTransform(utm1,CRS("+init=epsg:32611"))
+
+data_LA$utmEast <- utm2$x
+data_LA$utmNorth <- utm2$y
 
 # turn coordinates into spatial points
-points_WA <- st_as_sf(data_10_WA, coords = c("utmEast", "utmNorth"), crs = 
+points_WA <- data_10_WA %>% distinct(Site, .keep_all = TRUE) %>%
+  st_as_sf(coords = c("utmEast", "utmNorth"), crs = 
                      32610)
-
+points_WA
 points_SF <- st_as_sf(data_10_SF, coords = c("utmEast", "utmNorth"), crs = 
                         32610)
 
 points_LA <- st_as_sf(data_LA, coords = c("utmEast", "utmNorth"), crs = 
                         32611)
 
-# mapview(points_LA)
-
 
 # check that the points look ok
-# mapview(points_WA)
-# mapview(points_SF)
-# mapview(points_LA)
+mapview(points_WA)
+mapview(points_SF)
+mapview(points_LA)
 
+
+# keep only 1 unique site row for each 
+
+points_WA <- points_WA %>% distinct(Site, .keep_all = TRUE)
+points_WA$Site
+
+points_SF <- points_SF %>% distinct(Site, .keep_all = TRUE)
+points_SF
+
+points_LA <- points_LA %>% distinct(Site, .keep_all = TRUE)
+points_LA
 
 ################################################################################
 ## INCOME DATA
 ## median household income data from American Community Survey
 
-# Sys.getenv("CENSUS_API_KEY")
+Sys.getenv("CENSUS_API_KEY")
 # load census API key
 # census_api_key("e649b78a1d98fe7e1c9ff7039840781976777eb6",
                install = TRUE)
+# readRenviron("~/.Renviron")
 
 # load in ACS variables  from 2019 
 v17 <- load_variables(2019, "acs5", cache = TRUE)
@@ -96,8 +137,8 @@ tractincomeCA <- get_acs(state = "CA",
                          variables = c(medincome="B19013_001"), geometry = TRUE)
 
 # save whole state to a shapefile - currently not needed so will leave as comment
-# st_write(tractincomeWA, "WA_med_income.shp")
-# st_write(tractincomeCA, "CA_med_income.shp")
+st_write(tractincomeWA, "WA_med_income.shp", append = FALSE)
+st_write(tractincomeCA, "CA_med_income.shp", append = FALSE)
 
 # determine coordinate system
 suggest_top_crs(tractincomeWA) # 32148 is projected CRS 
@@ -112,14 +153,17 @@ tractsKP <- tractincomeWA %>% dplyr::filter(substr(GEOID, 1, 5)
 # mapview(tractsKP) # looks good
 
 # write king and pierce county shapefiles 
-# st_write(tractsKP, here("data", "income_maps", "seatac_med_income.shp"))
+here()
+st_write(tractsKP, here("data", "income_maps", "seatac_med_income.shp"),
+         append = FALSE)
 
 # crop to actual study area 
 tractsKP <- st_transform(tractsKP, crs=4326)
 tractsKP_crop <- st_crop(tractsKP, c(xmin= -121.7, ymin = 46.7, xmax = -122.8, ymax = 47.8))
 
 # write shapefiles for cropped area 
-# st_write(tractsKP_crop, here("data", "income_maps", "seatac_urban_med_income.shp"))
+st_write(tractsKP_crop, here("data", "income_maps", "seatac_urban_med_income.shp"),
+         append = FALSE)
 
 
 # do the same for the bay area
@@ -135,7 +179,8 @@ tractsSF <- tractincomeCA %>% dplyr::filter(substr(GEOID, 1, 5)
 # mapview(tractsSF)
 
 # write SF bay area  shapefiles 
-# st_write(tractsSF, here("data", "income_maps", "sf_bay_med_income.shp"))
+st_write(tractsSF, here("data", "income_maps", "sf_bay_med_income.shp"),
+         append = FALSE)
 
 # do the same for LA
 # just LA county 
@@ -144,7 +189,8 @@ tractsLA <- tractincomeCA %>% dplyr::filter(substr(GEOID, 1, 5)
 
 # mapview(tractsLA)
 # write LA area shapefiles 
-# st_write(tractsLA, here("data", "income_maps", "la_county_med_income.shp"))
+st_write(tractsLA, here("data", "income_maps", "la_county_med_income.shp"),
+         append = FALSE)
 
 
 
@@ -181,20 +227,23 @@ wa_housing <- st_crop(wa_housing, c(xmin= -121.7, ymin = 46.7, xmax = -122.8, ym
 ca_housing <- st_read(here("data", "housing_maps", 
                            "ca_blk10_Census_change_1990_2010_PLA2.shp"))
 
-# filter to only king and pierce county
-wa_housing <- wa_housing %>% dplyr::filter(substr(BLK10, 1, 5) 
-                                           %in% c("53033", "53053"))
+# filter to only bay area counties
+sf_housing <- ca_housing %>% dplyr::filter(substr(BLK10, 1, 5) 
+                                           %in% c("06055", "06041", 
+                                                  "06095", "06013",
+                                                  "06001", "06075",
+                                                  "06081", "06085"))
 
 # we only need 2010 housing data - select relevant info
 
-colnames(wa_housing)
-wa_housing <- wa_housing %>% dplyr::select(BLK10, WATER10, POP10, 
+colnames(sf_housing)
+sf_housing <- sf_housing %>% dplyr::select(BLK10, WATER10, POP10, 
                                            HU10, HUDEN10, HHUDEN10,
                                            PUBFLAG:geometry)
-colnames(wa_housing)
-# mapview(wa_housing)
+colnames(sf_housing)
+mapview(sf_housing)
 
-# st_write(wa_housing, here("data", "housing_maps", "kp_urban_huden_2010.shp"))
+st_write(sf_housing, here("data", "housing_maps", "sf_urban_huden_2010.shp"))
 
 
 ################################################################################
@@ -202,12 +251,12 @@ colnames(wa_housing)
 
 # load LandSat NDVI raster from GRC GEE code 
 
-ndvi_kp <- raster(here("data", "NDVI_data", "NDVI2020_tawa_test.TIF"))
+ndvi_kp <- raster(here("data", "NDVI_data", "NDVI2020-TAWA-30-3857.TIF"))
 
 
 # reproject points to raster crs 
 points_WA <- st_transform(points_WA, crs = st_crs(ndvi_kp))
-
+points_WA
 # extract the proportion of the buffer that has an NDVI greater than 0.2 (vegetation cover)
 # this returns a list, so we can use lapply to calculate the proportion for each site
 ndvi_extract <- raster::extract(ndvi_kp, points_WA, buffer = 1500)
