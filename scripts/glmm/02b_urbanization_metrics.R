@@ -22,7 +22,9 @@ library(tidycensus)
 # remotes::install_github("walkerke/crsuggest") 
 library(crsuggest)
 library(tidyr)
-
+library(terra)
+install.packages("spatialEco")
+library(spatialEco)
 
 ################################################################################
 ## notes on projections: we're going to use WGS84/UTM because we need to work in 
@@ -193,7 +195,6 @@ tractsLA <- tractincomeCA %>% dplyr::filter(substr(GEOID, 1, 5)
         #  append = FALSE)
 
 
-
 ################################################################################
 ## HOUSING DENSITY DATA 
 ## read in housing density  data - starting with WA 
@@ -274,6 +275,8 @@ colnames(la_housing)
 
 ndvi_kp <- raster(here("data", "NDVI_data", "NDVI2020-TAWA-30-3857.TIF"))
 
+suggest_top_crs(ndvi_kp)
+ndvi_kp <- projectRaster(ndvi_kp, crs = "EPSG:6599")
 
 # reproject points to raster crs 
 points_WA <- st_transform(points_WA, crs = st_crs(ndvi_kp))
@@ -302,11 +305,13 @@ points_WA$prop_veg <- prop_veg
 # currently this doesn't cover the whole bay area - will need to update 
 
 ndvi_sf <- raster(here("data", "NDVI_data", "NDVI2020_OACA-30-3857.TIF"))
-
+suggest_top_crs(ndvi_sf)
+ndvi_sf <- projectRaster(ndvi_sf, crs = "EPSG:7132")
 
 # reproject points to raster crs 
 points_SF <- st_transform(points_SF, crs = st_crs(ndvi_sf))
 points_SF
+
 # extract the proportion of the buffer that has an NDVI greater than 0.2 (vegetation cover)
 # this returns a list, so we can use lapply to calculate the proportion for each site
 ndvi_extract <- raster::extract(ndvi_sf, points_SF, buffer = 1000)
@@ -331,10 +336,12 @@ points_SF$prop_veg <- prop_veg
 
 # read in NDVI
 ndvi_la <- raster(here("data", "NDVI_data", "NDVI2020_LACA-30-3857.TIF"))
+suggest_top_crs(ndvi_la)
+ndvi_la <- projectRaster(ndvi_la, crs = "EPSG:26799")
 
 # reproject points to raster crs 
 points_LA <- st_transform(points_LA, crs = st_crs(ndvi_la))
-
+st_crs(points_LA)
 # extract the proportion of the buffer that has an NDVI greater than 0.2 (vegetation cover)
 # this returns a list, so we can use lapply to calculate the proportion for each site
 ndvi_extract <- raster::extract(ndvi_la, points_LA, buffer = 1000)
@@ -414,6 +421,10 @@ colnames(calenv) <- c("GEOID", "Rank")
 # bind together
 env_data <- rbind(waenv,calenv)
 
+
+
+
+
 ################################################################################
 
 ################################################################################
@@ -451,6 +462,30 @@ points_LA$imp_surf <- imp$Class_Names
 
 ################################################################################
 # additional calculations
+
+# merge the env health data to polygons
+
+# first need to make all the tracts in the same projection 
+# we'll use WGS84 
+
+tractsLA <- st_transform(tractsLA, crs ="EPSG:4326")
+tractsSF <- st_transform(tractsSF, crs ="EPSG:4326")
+tractsKP <- st_transform(tractsKP, crs ="EPSG:4326")
+
+# now combine the geometries to make one big set of polygons 
+tractsCA <- st_union(tractsLA, tractsSF)
+# mapview(tractsCA)
+
+env_WA <- merge(blocksWA, vulnranks, by.x = "GEOID",
+                      by.y = "GEOID")
+
+env_SF
+
+env_LA 
+
+################################################################################
+
+################################################################################
 
 # housing density buffer - WA
 #  transform to shapefile - need a masking raster, we'll use NDVI 
@@ -490,20 +525,24 @@ points_SF$huden2010 <- hu_den$layer
 # for LA, we'll need to clip the shp (there are island in LA count that 
 # are cut out of our raster)
 
-# first we'll make a polygon out of our raster to create a boundary,
+# first we'll make a polygon out of our raster extent to create a boundary,
 # then clip the housing density polygon
-install.packages("spex")
-library(spex)
-ndvi_poly <- polygonize(ndvi_la)
-ndvi_poly <- as.polygons(ext())
-ndvi_poly <- rasterToPolygons(ndvi_la, fun=NULL, 
-                              n=4, na.rm=TRUE, digits=12, dissolve=FALSE)
+library(rgeos)
 
-#  transform to shapefile - need a masking raster, we'll use NDVI 
+
+ndvi_poly <- as.polygons(ext(ndvi_la), crs = "EPSG:26799")
+ndvi_poly <- st_as_sf(ndvi_poly)
+
 # transform to same proj
-la_housing <- st_transform(la_housing, st_crs(ndvi_la))
+la_housing <- st_transform(la_housing, st_crs(ndvi_poly))
+
+la_hous_crop <- st_intersection(la_housing, ndvi_poly)
+mapview(la_hous_crop)
+
+#  transform to shapefile - need a masking raster 
+
 # change to raster 
-la_hous_rast <- rasterize(la_housing, ndvi_la,
+la_hous_rast <- rasterize(la_hous_crop, ndvi_la,
                           field = "HUDEN10")
 
 # transform points to same proj as raster
@@ -568,6 +607,16 @@ med_inc
 points_LA$med_inc <- med_inc$layer
 
 # merge WA/SF/LA points 
+suggest_top_crs(points_LA)
+
+env_data
+
+# first get everything into the same projection 
+points_WA <- st_transform(tractsKP, st_crs(ndvi_kp))
+wa_income <- st_transform(tractsKP, st_crs(ndvi_kp))
+wa_income <- st_transform(tractsKP, st_crs(ndvi_kp))
+
+glimpse(points_WA)
 
 # env health rank buffer
 
