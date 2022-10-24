@@ -569,6 +569,8 @@ points_SF$huden2010 <- hu_den$layer
 # then clip the housing density polygon
 library(rgeos)
 
+# we're also going to clip the NDVI file because it's huge 
+
 
 ndvi_poly <- as.polygons(ext(ndvi_la), crs = "EPSG:26799")
 ndvi_poly <- st_as_sf(ndvi_poly)
