@@ -23,9 +23,9 @@ hist(data2$shannon.di)
 hist(data$species.richness)
 data$species.richness
 
-data2$shannondi <- data2$shannon.di+1
+data2$shannondi <- data2$shannon.di+0.00001
 
-data3$coyote
+data3$coyote <- data3$Coyote+0.00001
 # look at distribution of data 
 
 qqp(data2$richness, "norm")
@@ -37,14 +37,14 @@ qqp(data2$richness, "lnorm")
 # function. Save the output and extract the estimates of each parameter as I
 # have shown below.
 
-nbinom <- fitdistr(data3$Coyote, "Negative Binomial")
-qqp(data3$Coyote, "nbinom", size = nbinom$estimate[[1]], mu = nbinom$estimate[[2]])
+nbinom <- fitdistr(data3$coyote, "Negative Binomial")
+qqp(data3$coyote, "nbinom", size = nbinom$estimate[[1]], mu = nbinom$estimate[[2]])
 
-poisson <- fitdistr(data3$Coyote, "Poisson")
-qqp(data3$Coyote, "pois",  lambda = poisson$estimate[[1]])
+poisson <- fitdistr(data3$coyote, "Poisson")
+qqp(data3$coyote, "pois",  lambda = poisson$estimate[[1]])
 
-gamma <- fitdistr(data3$Coyote, "gamma")
-qqp(data3$Coyote, "gamma", shape = gamma$estimate[[1]], rate = gamma$estimate[[2]])
+gamma <- fitdistr(data3$coyote, "gamma")
+qqp(data3$coyote, "gamma", shape = gamma$estimate[[1]], rate = gamma$estimate[[2]])
 
 # read data - avg
 data <- read_csv("data/avg_spp_rich_fall20-sum21.csv")

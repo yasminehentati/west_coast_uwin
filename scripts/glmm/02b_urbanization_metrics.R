@@ -418,9 +418,17 @@ waenv <- waenv %>% dplyr::filter(substr(State.FIPS.Code, 1, 5)
 colnames(waenv) <- c("GEOID", "Rank")
 colnames(calenv) <- c("GEOID", "Rank")
 
+# add leading 0s to california data
+library(bit64)
+
+calenv$GEOID <- sprintf("%011s", calenv$GEOID)
+
+# this is now characters, so change waenv to match
+waenv$GEOID <- as.character(waenv$GEOID)
+
 # bind together
 env_data <- rbind(waenv,calenv)
-
+env_data$GEOID
 
 
 
@@ -465,23 +473,55 @@ points_LA$imp_surf <- imp$Class_Names
 
 # merge the env health data to polygons
 
-# first need to make all the tracts in the same projection 
-# we'll use WGS84 
-
-tractsLA <- st_transform(tractsLA, crs ="EPSG:4326")
-tractsSF <- st_transform(tractsSF, crs ="EPSG:4326")
-tractsKP <- st_transform(tractsKP, crs ="EPSG:4326")
-
-# now combine the geometries to make one big set of polygons 
-tractsCA <- st_union(tractsLA, tractsSF)
-# mapview(tractsCA)
-
-env_WA <- merge(blocksWA, vulnranks, by.x = "GEOID",
+env_LA <- merge(tractsLA, env_data, by.x = "GEOID",
                       by.y = "GEOID")
 
-env_SF
+env_WA <- merge(tractsKP, env_data, by.x = "GEOID",
+                by.y = "GEOID")
 
-env_LA 
+env_SF <- merge(tractsSF, env_data, by.x = "GEOID",
+                by.y = "GEOID")
+
+env_data
+
+# remove empty geometries first for WA 
+env_WA <- env_WA[!st_is_empty(env_WA),]
+
+# reproject to match NDVI rasters
+env_LA <- st_transform(env_LA, st_crs(ndvi_la))
+env_WA <- st_transform(env_WA, st_crs(ndvi_kp))
+env_SF <- st_transform(env_SF, st_crs(ndvi_sf))
+
+# rasterize so we can get buffers for the points 
+wa_env_rast <- rasterize(env_WA, ndvi_kp,
+                          field = "Rank")
+
+sf_env_rast <- rasterize(env_SF, ndvi_sf,
+                         field = "Rank")
+
+la_env_rast <- rasterize(env_LA, ndvi_la,
+                         field = "Rank")
+
+
+# reproject points to match 
+points_LA <- st_transform(points_LA, st_crs(la_env_rast))
+points_WA <- st_transform(points_WA, st_crs(wa_env_rast))
+points_SF <- st_transform(points_SF, st_crs(sf_env_rast))
+
+# extract buffers
+wa_env_values <- raster::extract(wa_env_rast, points_WA, fun=mean, buffer= 1000, df=TRUE)
+
+sf_env_values <- raster::extract(sf_env_rast, points_SF, fun=mean, buffer= 1000, df=TRUE)
+
+la_env_values <- raster::extract(la_env_rast, points_LA, fun=mean, buffer= 1000, df=TRUE)
+
+
+points_WA$rank_buff <- wa_env_values$layer
+points_SF$rank_buff <- sf_env_values$layer
+points_LA$rank_buff <- la_env_values$layer
+
+# write csv to save all covs so far 
+data_WA <- st_drop_geometry(points_WA)
 
 ################################################################################
 
@@ -629,3 +669,15 @@ glimpse(points_WA)
 urb_pca <- prcomp(counts_df[,c(1:7,10,11)], center = TRUE,scale. = TRUE)
 
 summary(mtcars.pca)
+
+
+################################################################################
+# write csv to save all covs 
+# don't need geometries
+data_WA <- st_drop_geometry(points_WA)
+data_SF <- st_drop_geometry(points_SF)
+data_LA <- st_drop_geometry(points_LA)
+
+write_csv(data_WA, here("data", "WA_counts_covs_10-20-22.csv"))
+write_csv(data_SF, here("data", "SF_counts_covs_10-20-22.csv"))
+write_csv(data_LA, here("data", "LA_counts_covs_10-20-22.csv"))
