@@ -185,14 +185,14 @@ tractsSF <- tractincomeCA %>% dplyr::filter(substr(GEOID, 1, 5)
          # append = FALSE)
 
 # do the same for LA
-# just LA county 
+# just LA county and orange county
 tractsLA <- tractincomeCA %>% dplyr::filter(substr(GEOID, 1, 5) 
-                                            %in% c("06037"))
-
+                                            %in% c("06037", "06059"))
+colnames(tractsLA)
 # mapview(tractsLA)
 # write LA area shapefiles 
-# st_write(tractsLA, here("data", "income_maps", "la_county_med_income.shp"),
-        #  append = FALSE)
+# st_write(tractsLA, here("data", "income_maps", "la_orange_county_med_income.shp"),
+     #      append = FALSE)
 
 
 ################################################################################
@@ -252,9 +252,9 @@ colnames(sf_housing)
 
 # do the same with LA 
 
-# filter to only LA cty
+# filter to only LA cty and orange cty
 la_housing <- ca_housing %>% dplyr::filter(substr(BLK10, 1, 5) 
-                                           %in% c("06037"))
+                                           %in% c("06037", "06059"))
 
 # we only need 2010 housing data - select relevant info
 
@@ -262,10 +262,12 @@ colnames(la_housing)
 la_housing <- la_housing %>% dplyr::select(BLK10, WATER10, POP10, 
                                            HU10, HUDEN10, HHUDEN10,
                                            PUBFLAG:geometry)
+
 colnames(la_housing)
 
 # st_write(la_housing, here("data", "housing_maps", "la_urban_huden_2010.shp"),
-#          append = FALSE)
+     #      append = FALSE)
+
 
 
 ################################################################################
@@ -377,33 +379,27 @@ calenv <- calenv %>% dplyr::filter(substr(Census.Tract, 1, 4)
                                                 "6095", "6013",
                                                 "6001", "6075",
                                                 "6081", "6085",
-                                                "6037"))
+                                                "6037", "6059"))
 # remove variables we don't care about
-calenv <- calenv %>% dplyr::select(Census.Tract, CES.4.0.Percentile)
+calenv <- calenv %>% dplyr::select(Census.Tract, Pollution.Burden.Score)
 
 # convert into rankings to match washington data
-
-# divide percentile by 10
-calenv <- calenv %>%  
-  mutate(NewPercentile = CES.4.0.Percentile / 10)
 
 # drop NAs
 calenv <- drop_na(calenv)
 
 # round to ranking - we'll do the same as WA EHD and round at 0.5
+# skipping this right now since we're doing a buffer anyway
 
-half_ceil <- function(x){
-  whole = ceiling(x)
-  if(x >= whole - .5){
-    return(whole)
-  } else
-  return(whole - 1)
-}
+# half_ceil <- function(x){
+ #  whole = ceiling(x)
+#   if(x >= whole - .5){
+#     return(whole)
+#   } else
+ #  return(whole - 1)
+# }
 
-calenv$CESrank <- sapply(calenv$NewPercentile, half_ceil)
-
-# remove everything except rankings and tract name 
-calenv <- calenv %>% dplyr::select(Census.Tract, CESrank)
+# calenv$CESrank <- sapply(calenv$NewPercentile, half_ceil)
 calenv
 
 # now with wa
@@ -421,25 +417,28 @@ colnames(calenv) <- c("GEOID", "Rank")
 # add leading 0s to california data
 library(bit64)
 
-calenv$GEOID <- sprintf("%011s", calenv$GEOID)
+# for mac 
+# calenv$GEOID <- sprintf("%011f", calenv$GEOID)
 
-# this is now characters, so change waenv to match
-waenv$GEOID <- as.character(waenv$GEOID)
+# for mac: this is now characters, so change waenv to match
+# waenv$GEOID <- as.character(waenv$GEOID)
+
+# for windows - sprintf doesn't seem to work so using a different solution
+calenv$GEOID <- sprintf(fmt = "%011s", calenv$GEOID) %>% 
+  gsub(pattern = " ", replacement = "0", x = .)
+
 
 # bind together
 env_data <- rbind(waenv,calenv)
 env_data$GEOID
 
-
-
-
 ################################################################################
 
 ################################################################################
 ## impervious surface calculation 
-
+library(here)
 # load impervious cover raster map
-imp_map <- raster(here("data", "NCLD_imp", 
+imp_map <- raster(here("data", "NLCD_imp", 
                        "nlcd_2019_impervious_descriptor_l48_20210604.img"))
 
 # again reproject  points to match raster
@@ -450,7 +449,7 @@ points_WA <- st_transform(points_WA, st_crs(imp_map))
 imp <- raster::extract(imp_map, points_WA, fun=mean, buffer= 1000, df=TRUE)
 imp
 
-points_WA$imp_surf <- imp$Class_Names
+points_WA$imp_surf <- imp$nlcd_2019_impervious_descriptor_l48_20210604
 
 # for SF 
 points_SF <- st_transform(points_SF, st_crs(imp_map))
@@ -459,47 +458,105 @@ points_SF <- st_transform(points_SF, st_crs(imp_map))
 imp <- raster::extract(imp_map, points_SF, fun=mean, buffer= 1000, df=TRUE)
 imp
 
-points_SF$imp_surf <- imp$Class_Names
+points_SF$imp_surf <- imp$nlcd_2019_impervious_descriptor_l48_20210604
 
 # for LA 
 points_LA <- st_transform(points_LA, st_crs(imp_map))
 
 # extract the mean impervious cover around each point using 500 m radius buffer
 imp <- raster::extract(imp_map, points_LA, fun=mean, buffer= 1000, df=TRUE)
-points_LA$imp_surf <- imp$Class_Names
+points_LA$imp_surf <- imp$nlcd_2019_impervious_descriptor_l48_20210604
 
 ################################################################################
 # additional calculations
 
-# merge the env health data to polygons
+# WA - merge the env health data to polygons
 
-env_LA <- merge(tractsLA, env_data, by.x = "GEOID",
-                      by.y = "GEOID")
+# ran into some issues with non-matching census tracts
+# so we'll manually make sure all point have a matching polygon
+points_WA <- st_transform(points_WA, st_crs(tractsKP))
 
-env_WA <- merge(tractsKP, env_data, by.x = "GEOID",
-                by.y = "GEOID")
+env_WA_sp <- merge(tractsKP, env_data, by.x = "GEOID",
+                   by.y = "GEOID", all.x = TRUE) 
 
-env_SF <- merge(tractsSF, env_data, by.x = "GEOID",
-                by.y = "GEOID")
+# mapview(list(points_WA,env_WA_sp), zcol = list(NULL, "Rank"))
 
-env_data
+# get GEOID and rank for each point by finding what polygon they lie within
+env_pts_WA <- point.in.poly(points_WA, env_WA_sp)
 
-# remove empty geometries first for WA 
-env_WA <- env_WA[!st_is_empty(env_WA),]
+# find GEOIDs without ranks and manually enter averages of surrounding polygons
+# find faster way to do this later
+missingWA <- env_pts_WA[is.na(env_pts_WA$Rank), ]   # empty Ranks within points
+
+env_data$Rank[env_data$GEOID==53053063401]
+env_WA_sp$Rank[env_WA_sp$GEOID==53053063401] <-  10 # fill the polygon shapefile
+# with corresponding rank for the GEOID that point of interest lies within 
+# mapview(list(env_WA_sp, points_WA), zcol = list("Rank", NULL))
+
+
+# LA - merge env health data to polygons 
+points_LA <- st_transform(points_LA, st_crs(tractsLA))
+
+env_LA_sp <- merge(tractsLA, env_data, by.x = "GEOID",
+                   by.y = "GEOID", all.x = TRUE) 
+
+# mapview(list(points_LA,env_LA_sp), zcol = list(NULL, "Rank"))
+
+# get GEOID and rank for each point by finding what polygon they lie within
+env_pts_LA <- point.in.poly(points_LA, env_LA_sp)
+
+# find GEOIDs without ranks and manually enter averages of surrounding polygons
+# find faster way to do this later
+missingLA <- env_pts_LA[is.na(env_pts_LA$Rank), ]   # empty Ranks within points
+# mapview(list(env_LA_sp, missingLA), zcol = list("Rank", NULL))
+
+
+env_LA_sp$Rank[env_LA_sp$GEOID=="06037930400"] <- ((4.66+4.26+6.11+5.65+6.11)/5)   # fill the polygon shapefile
+# with corresponding rank for the GEOID that point of interest lies within 
+env_LA_sp$Rank[env_LA_sp$GEOID=="06037300602"] <- ((6.46+6.81+5.38+6.32+5.65)/5)
+env_LA_sp$Rank[env_LA_sp$GEOID=="06059052430"] <- 4.18
+env_LA_sp$Rank[env_LA_sp$GEOID=="06059052437"] <- 5.49
+# mapview(list(env_LA_sp, points_LA), zcol = list("Rank", NULL))
+
+
+
+
+# SF - merge env health data to polygons 
+points_SF <- st_transform(points_SF, st_crs(tractsSF))
+
+env_SF_sp <- merge(tractsSF, env_data, by.x = "GEOID",
+                   by.y = "GEOID", all.x = TRUE) 
+
+# mapview(list(points_SF,env_SF_sp), zcol = list(NULL, "Rank"))
+
+# get GEOID and rank for each point by finding what polygon they lie within
+env_pts_SF <- point.in.poly(points_SF, env_SF_sp)
+
+# find GEOIDs without ranks and manually enter averages of surrounding polygons
+# find faster way to do this later
+# missingSF <- env_pts_SF[is.na(env_pts_SF$Rank), ]   # empty Ranks within points
+# mapview(list(env_SF_sp, missingSF), zcol = list("Rank", NULL))
+# none needed at this time 
+
+# remove empty geometries first
+env_WA_sp <- env_WA_sp[!st_is_empty(env_WA_sp),]
+env_SF_sp <- env_SF_sp[!st_is_empty(env_SF_sp),]
+env_LA_sp <- env_LA_sp[!st_is_empty(env_LA_sp),]
 
 # reproject to match NDVI rasters
-env_LA <- st_transform(env_LA, st_crs(ndvi_la))
-env_WA <- st_transform(env_WA, st_crs(ndvi_kp))
-env_SF <- st_transform(env_SF, st_crs(ndvi_sf))
+env_WA_sp <- st_transform(env_WA_sp, st_crs(ndvi_kp))
+env_LA_sp <- st_transform(env_LA_sp, st_crs(ndvi_la))
+env_SF_sp <- st_transform(env_SF_sp, st_crs(ndvi_sf))
+
 
 # rasterize so we can get buffers for the points 
-wa_env_rast <- rasterize(env_WA, ndvi_kp,
+wa_env_rast <- rasterize(env_WA_sp, ndvi_kp,
                           field = "Rank")
 
-sf_env_rast <- rasterize(env_SF, ndvi_sf,
+sf_env_rast <- rasterize(env_SF_sp, ndvi_sf,
                          field = "Rank")
 
-la_env_rast <- rasterize(env_LA, ndvi_la,
+la_env_rast <- rasterize(env_LA_sp, ndvi_la,
                          field = "Rank")
 
 
@@ -507,6 +564,10 @@ la_env_rast <- rasterize(env_LA, ndvi_la,
 points_LA <- st_transform(points_LA, st_crs(la_env_rast))
 points_WA <- st_transform(points_WA, st_crs(wa_env_rast))
 points_SF <- st_transform(points_SF, st_crs(sf_env_rast))
+
+# plot to check
+
+
 
 # extract buffers
 wa_env_values <- raster::extract(wa_env_rast, points_WA, fun=mean, buffer= 1000, df=TRUE)
@@ -520,7 +581,7 @@ points_WA$rank_buff <- wa_env_values$layer
 points_SF$rank_buff <- sf_env_values$layer
 points_LA$rank_buff <- la_env_values$layer
 
-# write csv to save all covs so far 
+# save all covs so far 
 data_WA <- st_drop_geometry(points_WA)
 
 ################################################################################
@@ -528,6 +589,8 @@ data_WA <- st_drop_geometry(points_WA)
 ################################################################################
 
 # housing density buffer - WA
+
+
 #  transform to shapefile - need a masking raster, we'll use NDVI 
 # transform to same proj
 wa_housing <- st_transform(wa_housing, st_crs(ndvi_kp))
@@ -569,22 +632,22 @@ points_SF$huden2010 <- hu_den$layer
 # then clip the housing density polygon
 library(rgeos)
 
-# we're also going to clip the NDVI file because it's huge 
+# we're also going to clip the NDVI file because it's huge
 
 
-ndvi_poly <- as.polygons(ext(ndvi_la), crs = "EPSG:26799")
-ndvi_poly <- st_as_sf(ndvi_poly)
+# ndvi_poly <- as.polygons(ext(ndvi_la), crs = "EPSG:26799")
+# ndvi_poly <- st_as_sf(ndvi_poly)
+
 
 # transform to same proj
-la_housing <- st_transform(la_housing, st_crs(ndvi_poly))
+# la_housing <- st_transform(la_housing, st_crs(ndvi_poly))
+# la_hous_crop <- st_intersection(la_housing, ndvi_poly)
 
-la_hous_crop <- st_intersection(la_housing, ndvi_poly)
-mapview(la_hous_crop)
 
 #  transform to shapefile - need a masking raster 
 
 # change to raster 
-la_hous_rast <- rasterize(la_hous_crop, ndvi_la,
+la_hous_rast <- rasterize(la_housing, ndvi_la,
                           field = "HUDEN10")
 
 # transform points to same proj as raster
@@ -592,18 +655,27 @@ points_LA<- st_transform(points_LA, st_crs(la_hous_rast))
 
 # calculate housing density average w/ 1000m buffer
 hu_den <- raster::extract(la_hous_rast, points_LA, fun=mean, buffer= 1000, df=TRUE)
-hu_den
+la_hous_crop$HUDEN10
 
 points_LA$huden2010 <- hu_den$layer
-
+points_WA$huden2010
+points_LA$huden2010
 ################################################################################
 # income buffer - WA
+
+
+
 #  transform to shapefile - need a masking raster, we'll use NDVI 
 # transform to same proj
 wa_income <- st_transform(tractsKP, st_crs(ndvi_kp))
+glimpse(wa_income)
+
+# remove empty geometries first
+wa_income <- wa_income[!st_is_empty(wa_income),]
+
 # change to raster 
 wa_inc_rast <- rasterize(wa_income, ndvi_kp,
-                          field = "med_inc")
+                          field = "estimate")
 
 # transform points to same proj as raster
 points_WA<- st_transform(points_WA, st_crs(wa_inc_rast))
@@ -615,12 +687,18 @@ med_inc
 points_WA$med_inc <- med_inc$layer
 
 # income buffer - SF
+
+
 #  transform to shapefile - need a masking raster, we'll use NDVI 
 # transform to same proj
 sf_income <- st_transform(tractsSF, st_crs(ndvi_sf))
+
+# remove empty geometries first
+sf_income <- sf_income[!st_is_empty(sf_income),]
+
 # change to raster 
 sf_inc_rast <- rasterize(sf_income, ndvi_sf,
-                         field = "med_inc")
+                         field = "estimate")
 
 # transform points to same proj as raster
 points_SF<- st_transform(points_SF, st_crs(sf_inc_rast))
@@ -635,9 +713,13 @@ points_SF$med_inc <- med_inc$layer
 #  transform to shapefile - need a masking raster, we'll use NDVI 
 # transform to same proj
 la_income <- st_transform(tractsLA, st_crs(ndvi_la))
+
+# remove empty geometries first
+la_income <- la_income[!st_is_empty(la_income),]
+
 # change to raster 
 la_inc_rast <- rasterize(la_income, ndvi_la,
-                         field = "med_inc")
+                         field = "estimate")
 
 # transform points to same proj as raster
 points_LA<- st_transform(points_LA, st_crs(la_inc_rast))
@@ -660,26 +742,28 @@ wa_income <- st_transform(tractsKP, st_crs(ndvi_kp))
 
 glimpse(points_WA)
 
-# env health rank buffer
-
-# merge all metadata with count data 
 
 ################################################################################
-# pca 
+# pca
+# don't need geometries
+data_WA <- st_drop_geometry(points_WA)
+data_SF <- st_drop_geometry(points_SF)
+data_LA <- st_drop_geometry(points_LA)
 
+# bind all together
+all_CA <- rbind(data_SF, data_LA)
+all_dat <- rbind(all_CA, data_WA)
 
-urb_pca <- prcomp(counts_df[,c(1:7,10,11)], center = TRUE,scale. = TRUE)
+colnames(all_dat)
+urb_pca <- prcomp(all_dat[,c(30,31,33)], center = TRUE,scale. = TRUE)
 
 summary(mtcars.pca)
 
 
 ################################################################################
 # write csv to save all covs 
-# don't need geometries
-data_WA <- st_drop_geometry(points_WA)
-data_SF <- st_drop_geometry(points_SF)
-data_LA <- st_drop_geometry(points_LA)
 
-write_csv(data_WA, here("data", "WA_counts_covs_10-20-22.csv"))
-write_csv(data_SF, here("data", "SF_counts_covs_10-20-22.csv"))
-write_csv(data_LA, here("data", "LA_counts_covs_10-20-22.csv"))
+
+write_csv(data_WA, here("data", "WA_counts_covs_10-25-22.csv"))
+write_csv(data_SF, here("data", "SF_counts_covs_10-25-22.csv"))
+write_csv(data_LA, here("data", "LA_counts_covs_10-25-22.csv"))
