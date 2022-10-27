@@ -25,16 +25,17 @@ library(tidyr)
 library(terra)
 install.packages("spatialEco")
 library(spatialEco)
+library(readr)
+library(ggfortify)
+library(rgeos)
 
 ################################################################################
 ## notes on projections: we're going to use WGS84/UTM because we need to work in 
 ## meters for our buffers. however, the data is split across 2 zones (11N and 10N)
-## so all steps will need to be done twice - once for each zone 
+## so all steps will need to be done for each zone 
 ################################################################################
 ## CAMERA LOCATIONS 
 ## get camera points 
-
-
 
 # load all sites
 all_sites <- read.csv(here("data", "counts_cleaned.csv"), stringsAsFactors = FALSE)
@@ -581,8 +582,7 @@ points_WA$rank_buff <- wa_env_values$layer
 points_SF$rank_buff <- sf_env_values$layer
 points_LA$rank_buff <- la_env_values$layer
 
-# save all covs so far 
-data_WA <- st_drop_geometry(points_WA)
+
 
 ################################################################################
 
@@ -630,24 +630,23 @@ points_SF$huden2010 <- hu_den$layer
 
 # first we'll make a polygon out of our raster extent to create a boundary,
 # then clip the housing density polygon
-library(rgeos)
 
 # we're also going to clip the NDVI file because it's huge
 
 
-# ndvi_poly <- as.polygons(ext(ndvi_la), crs = "EPSG:26799")
-# ndvi_poly <- st_as_sf(ndvi_poly)
+ndvi_poly <- as.polygons(ext(ndvi_la), crs = "EPSG:26799")
+ndvi_poly <- st_as_sf(ndvi_poly)
 
 
 # transform to same proj
-# la_housing <- st_transform(la_housing, st_crs(ndvi_poly))
-# la_hous_crop <- st_intersection(la_housing, ndvi_poly)
+la_housing <- st_transform(la_housing, st_crs(ndvi_poly))
+la_hous_crop <- st_intersection(la_housing, ndvi_poly)
 
 
 #  transform to shapefile - need a masking raster 
 
 # change to raster 
-la_hous_rast <- rasterize(la_housing, ndvi_la,
+la_hous_rast <- rasterize(la_hous_crop, ndvi_la,
                           field = "HUDEN10")
 
 # transform points to same proj as raster
@@ -655,8 +654,7 @@ points_LA<- st_transform(points_LA, st_crs(la_hous_rast))
 
 # calculate housing density average w/ 1000m buffer
 hu_den <- raster::extract(la_hous_rast, points_LA, fun=mean, buffer= 1000, df=TRUE)
-la_hous_crop$HUDEN10
-
+hu_den
 points_LA$huden2010 <- hu_den$layer
 points_WA$huden2010
 points_LA$huden2010
@@ -733,17 +731,19 @@ points_LA$med_inc <- med_inc$layer
 # merge WA/SF/LA points 
 suggest_top_crs(points_LA)
 
-env_data
-
+glimpse(points_LA)
+glimpse(points_SF)
 # first get everything into the same projection 
 points_WA <- st_transform(tractsKP, st_crs(ndvi_kp))
 wa_income <- st_transform(tractsKP, st_crs(ndvi_kp))
 wa_income <- st_transform(tractsKP, st_crs(ndvi_kp))
 
-glimpse(points_WA)
+head(points_WA)
 
 
 ################################################################################
+
+
 # pca
 # don't need geometries
 data_WA <- st_drop_geometry(points_WA)
@@ -757,13 +757,54 @@ all_dat <- rbind(all_CA, data_WA)
 colnames(all_dat)
 urb_pca <- prcomp(all_dat[,c(30,31,33)], center = TRUE,scale. = TRUE)
 
-summary(mtcars.pca)
+
+summary(urb_pca)
+urb_pca$rotation
+
+# eigenvectors in r are default negative - flip to positive 
+urb_pca$rotation <- -urb_pca$rotation
+
+# plot pca
+biplot(urb_pca, scale = 0)
+
+# calculate var explained by each pc
+(VE <- urb_pca$sdev^2)
+
+# calculate proportion of variance explained by each pc
+PVE <- VE / sum(VE)
+round(PVE, 2)
+
+# pc1 explains 52% of variance aso we'll use that as our urbanization pca
+urb_pca_all <- urb_pca$x 
+urb_pca_all <- as.data.frame(urb_pca_all)
+all_dat$urb_pca <- urb_pca_all$PC1
+
+# let's make some nicer plots to visualize
+autoplot(urb_pca, data = all_dat, colour = 'City', loadings = TRUE, scale = 0)
 
 
 ################################################################################
+# add back in the rest of our count data
+colnames(all_dat)
+colnames(all_sites)
+
+# merge only covariate columns
+all_sites_covs <- all_sites %>% merge(all_dat[,c(1,29:35)], by = "Site", 
+                    keep_all_x = TRUE)
+
+all_sites_covs %>% group_by(City) 
+
 # write csv to save all covs 
+write_csv(all_sites_covs, here("data", "all_data_counts_covs_10-27-22.csv"))
+
+# add in covariates to richness and diversity data 
+
+vegandf <- read_csv("vegan_sites.csv")
+glimpse(vegandf)
+
+all_sites_covs_vegan <- all_sites %>% merge(all_dat[,c(1,29:35)], by = "Site", 
+                                      keep_all_x = TRUE)
 
 
-write_csv(data_WA, here("data", "WA_counts_covs_10-25-22.csv"))
-write_csv(data_SF, here("data", "SF_counts_covs_10-25-22.csv"))
-write_csv(data_LA, here("data", "LA_counts_covs_10-25-22.csv"))
+# write csv to save all covs 
+write_csv(all_sites_covs_vegan, here("data", "all_data_vegan_covs_10-27-22.csv"))
