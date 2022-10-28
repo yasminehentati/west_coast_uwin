@@ -801,11 +801,22 @@ autoplot(urb_pca, data = all_dat, colour = 'City', loadings = TRUE, scale = 0)
 colnames(all_dat)
 colnames(all_sites)
 
+all_dat <- read_csv(here("data", "all_data_counts_covs_10-27-22.csv"))
+
 # merge only covariate columns
 all_sites_covs <- all_sites %>% merge(all_dat[,c(1,29:35)], by = "Site", 
                     keep_all_x = TRUE)
+glimpse(all_dat)
 
-all_sites_covs %>% group_by(City) 
+# add back in sampling occasions 
+detections <- read_csv("data/raw_data_from_uwin/initial_data_yasmine.csv")
+detections <- detections %>% dplyr::select(-Species) %>% distinct(Site, Season, .keep_all = TRUE)
+
+detections
+test <- merge(all_sites_covs, detections[,c("Site", "Season", "J")], by.x = c("Site", "season"),
+      by.y = c("Site", "Season"), keep_all_x = TRUE, keep_all_y = FALSE)
+
+test$J
 # write csv to save all covs 
 write_csv(all_sites_covs, here("data", "all_data_counts_covs_10-27-22.csv"))
 
