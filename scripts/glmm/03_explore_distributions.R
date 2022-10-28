@@ -12,20 +12,22 @@ library(readr)
 library(here)
 library(tidyverse)
 
-# read data
-data <- read_csv("data/spp_rich_fall20-sum21.csv")
-data2 <- read_csv("vegan_sites.csv")
-data3 <- read_csv("data/counts_cleaned.csv")
-data3$Coyote
-glimpse(data2)
+# read in count and covariate data 
+all_dat <- read_csv(here("data", "all_data_counts_covs_10-27-22.csv"))
 
-hist(data2$shannon.di)
-hist(data$species.richness)
-data$species.richness
+# read in richness/diversity data 
+all_dat_veg <- read_csv(here("data", "all_data_vegan_covs_10-27-22.csv"))
+
+colnames(all_dat_veg)
+hist(all_dat_veg$shannon.di)
+hist(all_dat_veg$richness)
+
+
+boxplot()
 
 data2$shannondi <- data2$shannon.di+0.00001
 
-data3$coyote <- data3$Coyote+0.00001
+all_dat$coyote <- all_dat$Coyote+0.00001
 # look at distribution of data 
 
 qqp(data2$richness, "norm")
@@ -37,40 +39,14 @@ qqp(data2$richness, "lnorm")
 # function. Save the output and extract the estimates of each parameter as I
 # have shown below.
 
-nbinom <- fitdistr(data3$coyote, "Negative Binomial")
-qqp(data3$coyote, "nbinom", size = nbinom$estimate[[1]], mu = nbinom$estimate[[2]])
+nbinom <- fitdistr(all_dat$Raccoon, "Negative Binomial")
+qqp(all_dat$Raccoon, "nbinom", size = nbinom$estimate[[1]], mu = nbinom$estimate[[2]])
 
-poisson <- fitdistr(data3$coyote, "Poisson")
-qqp(data3$coyote, "pois",  lambda = poisson$estimate[[1]])
+poisson <- fitdistr(all_dat$Raccoon, "Poisson")
+qqp(all_dat$Raccoon, "pois",  lambda = poisson$estimate[[1]])
 
 gamma <- fitdistr(data3$coyote, "gamma")
 qqp(data3$coyote, "gamma", shape = gamma$estimate[[1]], rate = gamma$estimate[[2]])
-
-# read data - avg
-data <- read_csv("data/avg_spp_rich_fall20-sum21.csv")
-glimpse(data)
-
-# look at distribution of data 
-
-qqp(data$avg_richness, "norm")
-qqp(data$avg_richness, "lnorm")
-
-# qqp requires estimates of the parameters of the negative binomial, Poisson
-# and gamma distributions. You can generate estimates using the fitdistr
-# function. Save the output and extract the estimates of each parameter as I
-# have shown below.
-nbinom <- fitdistr(data$avg_richness, "Negative Binomial")
-qqp(data$avg_richness, "nbinom", size = nbinom$estimate[[1]], mu = nbinom$estimate[[2]])
-
-poisson <- fitdistr(data$avg_richness, "Poisson")
-qqp(data$avg_richness, "pois", lambda = poisson$estimate[[1]])
-
-gamma <- fitdistr(data$avg_richness, "gamma")
-qqp(data$avg_richness, "gamma", shape = gamma$estimate[[1]], rate = gamma$estimate[[2]])
-
-?qqp
-
-mod <-lmer(yield ~irrigation*density*fertilizer +(1|block/irrigation/density), data=crops)
 
 # read data - div
 data <- read_csv("data/diversity-fall20-sum21.csv")

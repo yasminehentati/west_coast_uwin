@@ -369,7 +369,7 @@ points_LA$prop_veg <- prop_veg
 ## ENVIRONMENTAL HEALTH DATA 
 # obtained from calenviroscreen and washington environmental health disparities map
 
-## starting with calenviroscreen
+## starting with calenviroscreen - pollution burden
 calenv <- read.csv(here("data", "calenviroscreen_v4.csv"))
 
 head(calenv)
@@ -404,7 +404,16 @@ calenv <- drop_na(calenv)
 calenv
 
 # now with wa
-waenv <- read.csv(here("data", "wa_envhealthdisp_v2.csv"))
+waenv1 <- read.csv(here("data", "WA Environmental Effects.csv"))
+waenv2 <- read.csv(here("data", "WA Environmental Exposures.csv"))
+
+waenv3 <- merge(waenv1, waenv2, by = "State.FIPS.Code")
+head(waenv3)
+
+# average effects and exposures
+waenv3$Rank <- rowMeans(waenv3[,c('Rank.x', 'Rank.y')])
+waenv <- waenv3 %>% dplyr::select(-c("Rank.x","Rank.y"))
+head(waenv)
 
 #get only our counties of interest 
 waenv <- waenv %>% dplyr::filter(substr(State.FIPS.Code, 1, 5) 
@@ -432,7 +441,10 @@ calenv$GEOID <- sprintf(fmt = "%011s", calenv$GEOID) %>%
 # bind together
 env_data <- rbind(waenv,calenv)
 env_data$GEOID
+head(env_data)
 
+# save all env data
+write_csv(env_data, here("data", "env_health_ranks_all.csv"))
 ################################################################################
 
 ################################################################################
@@ -757,6 +769,7 @@ all_dat <- rbind(all_CA, data_WA)
 colnames(all_dat)
 urb_pca <- prcomp(all_dat[,c(30,31,33)], center = TRUE,scale. = TRUE)
 
+glimpse(all_dat)
 
 summary(urb_pca)
 urb_pca$rotation
@@ -793,7 +806,6 @@ all_sites_covs <- all_sites %>% merge(all_dat[,c(1,29:35)], by = "Site",
                     keep_all_x = TRUE)
 
 all_sites_covs %>% group_by(City) 
-
 # write csv to save all covs 
 write_csv(all_sites_covs, here("data", "all_data_counts_covs_10-27-22.csv"))
 
@@ -802,7 +814,7 @@ write_csv(all_sites_covs, here("data", "all_data_counts_covs_10-27-22.csv"))
 vegandf <- read_csv("vegan_sites.csv")
 glimpse(vegandf)
 
-all_sites_covs_vegan <- all_sites %>% merge(all_dat[,c(1,29:35)], by = "Site", 
+all_sites_covs_vegan <- vegandf %>% merge(all_dat[,c(1,29:35)], by = "Site", 
                                       keep_all_x = TRUE)
 
 

@@ -17,6 +17,37 @@ library(raster) # raster handling (needed for relief)
 library(viridis) # viridis color scale
 library(cowplot) # stack ggplots
 library(rmarkdown)
+library(sf)
+
+
+################################################################################
+# read in data 
+
+# income shapefiles 
+sf_map <- st_read(here("data", "income_maps", "sf_bay_med_income.shp"))
+la_map <- st_read(here("data", "income_maps", "la_orange_county_med_income.shp"))
+wa_map <- st_read(here("data", "income_maps", "seatac_med_income.shp"))
+
+# environmental health data 
+env_data <- read_csv(here("data", "env_health_ranks_all.csv"))
+
+# subset out env data by area 
+waenv <- env_data %>% dplyr::filter(substr(GEOID, 1, 5) 
+                                 %in% c("53053", "53033"))
+
+sfenv <- env_data %>% dplyr::filter(substr(GEOID, 1, 5) 
+                                    %in% c("06055", "06041", 
+                                           "06095", "06013",
+                                           "06001", "06075",
+                                           "06081", "06085"))
+
+laenv <- env_data %>% dplyr::filter(substr(GEOID, 1, 5) 
+                                    %in% c("06037", "06059"))
+                  
+# merge env health data to shapefile                  
+sf_map <- sf_map %>% merge(sfenv, by = "GEOID", .keep_all_x=TRUE)
+la_map <- la_map %>% merge(laenv, by = "GEOID", .keep_all_x=TRUE)
+wa_map <- wa_map %>% merge(waenv, by = "GEOID", .keep_all_x=TRUE)
 
 
 ################################################################################
