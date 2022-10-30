@@ -6,6 +6,8 @@
 
 
 library(readr)
+library(MuMIn)
+library(car)
 library(here)
 library(lme4)
 library(dplyr)
@@ -13,16 +15,22 @@ library(magrittr)
 # remotes::install_github("palday/coefplot2",
        #                  subdir = "pkg")
 library(coefplot2)
+install.packages("corrplot")
+library(corrplot)
 library(glmmTMB)
+
 library(aods3)
+install.packages("DHARMa")
 library(DHARMa)
 install.packages("sjPlot")
+library(ggplot2)
 
+# library(brms) 
 
 # read in count and covariate data 
 all_dat <- read_csv(here("data", "all_data_counts_covs_10-27-22.csv")) 
 
-View(all_dat)
+all_dat$rank_buff
 # read in richness/diversity data 
 all_dat_veg <- read_csv(here("data", "all_data_vegan_covs_10-27-22.csv")) 
 
@@ -43,7 +51,7 @@ all_dat <-  data.frame(all_dat %>% mutate_at(vars("prop_veg",
                                                   "imp_surf", "rank_buff",
                                                   "huden2010", "med_inc", 
                                                   "urb_pca"), scale))
-View(all_dat)
+
 all_dat_veg <-  data.frame(all_dat_veg %>% mutate_at(vars("prop_veg",
                                                   "imp_surf", "rank_buff",
                                                   "huden2010", "med_inc", 
@@ -54,6 +62,7 @@ ggplot(all_dat, aes(x = rank_buff)) +
   geom_histogram(fill = "white", colour = "black") +
   facet_grid(City ~ .)
 
+vif(mod)
 ################################################################################
 # coyote counts model 
 
@@ -63,10 +72,18 @@ ggplot(all_dat, aes(x = rank_buff)) +
 # 39% 0s for the coyotes - we'll try poisson and check for overdispersion 
 
 # universal model with random effects 
-mod1 <- glmmTMB(Coyote ~ urb_pca + rank_buff + med_inc + (1|season),
+mod1 <- glmmTMB(Coyote ~ urb_pca + rank_buff + med_inc + (1|season) + (1|City) +
+                (1|Site),
                 data = all_dat, family = "poisson")
 
-summary(mod1)
+
+cordat <- all_dat %>% dplyr::select(c(urb_pca, rank_buff, med_inc)) 
+
+head(cordat)
+
+dev.off()
+corr <- cor(cordat, method = "spearman")
+corrplot(corr, method='number')
 
 # check for overdispersion
 E2 <- resid(mod1, type = "pearson")
@@ -99,13 +116,13 @@ sum(E2^2) / (N - p)
 
 dat2 <- na.omit(all_dat)
 
-zipmod <- glmmTMB(Coyote ~ urb_pca + rank_buff + med_inc + (1|Site) + (1|season) +
+zipmod <- glmmTMB(Coyote ~ urb_pca + rank_buff + med_inc + (1|Site) + season +
                     (1|City), 
                    data = all_dat,
                    ziformula=~1,
                    family="poisson")
 
-
+?vif
 
 summary(zipmod)
 E2 <- resid(zipmod, type = "pearson")
