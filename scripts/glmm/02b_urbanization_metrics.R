@@ -492,17 +492,37 @@ points_WA <- st_transform(points_WA, st_crs(tractsKP))
 env_WA_sp <- merge(tractsKP, env_data, by.x = "GEOID",
                    by.y = "GEOID", all.x = TRUE) 
 
-# mapview(list(points_WA,env_WA_sp), zcol = list(NULL, "Rank"))
-
+ mapview(list(points_LA,env_LA_sp), zcol = list(NULL, "Rank"))
+sfmap
 # get GEOID and rank for each point by finding what polygon they lie within
 env_pts_WA <- point.in.poly(points_WA, env_WA_sp)
 
 # find GEOIDs without ranks and manually enter averages of surrounding polygons
+# from the online env health disparities map
 # find faster way to do this later
 missingWA <- env_pts_WA[is.na(env_pts_WA$Rank), ]   # empty Ranks within points
 
 env_data$Rank[env_data$GEOID==53053063401]
 env_WA_sp$Rank[env_WA_sp$GEOID==53053063401] <-  10 # fill the polygon shapefile
+env_WA_sp$Rank[env_WA_sp$GEOID==53053061502] <-  5
+env_WA_sp$Rank[env_WA_sp$GEOID==53053061501] <-  10
+env_WA_sp$Rank[env_WA_sp$GEOID==53053060908] <-  7
+env_WA_sp$Rank[env_WA_sp$GEOID==53053060907] <-  7
+env_WA_sp$Rank[env_WA_sp$GEOID==53053072315] <-  5
+env_WA_sp$Rank[env_WA_sp$GEOID==53053072314] <-  5
+env_WA_sp$Rank[env_WA_sp$GEOID==53053062901] <-  9
+env_WA_sp$Rank[env_WA_sp$GEOID==53053062902] <-  9
+env_WA_sp$Rank[env_WA_sp$GEOID==53053063302] <-  8
+env_WA_sp$Rank[env_WA_sp$GEOID==53053063301] <-  8
+env_WA_sp$Rank[env_WA_sp$GEOID==53053063402] <-  8
+env_WA_sp$Rank[env_WA_sp$GEOID==53053062502] <-  10
+env_WA_sp$Rank[env_WA_sp$GEOID==53053062501] <-  10
+env_WA_sp$Rank[env_WA_sp$GEOID==53053071603] <-  10
+env_WA_sp$Rank[env_WA_sp$GEOID==53053071604] <-  10
+env_WA_sp$Rank[env_WA_sp$GEOID==53053940012] <-  9
+env_WA_sp$Rank[env_WA_sp$GEOID==53053940013] <-  9
+env_WA_sp$Rank[env_WA_sp$GEOID==53053073501] <-  9
+env_WA_sp$Rank[env_WA_sp$GEOID==53053940009] <-  9
 # with corresponding rank for the GEOID that point of interest lies within 
 # mapview(list(env_WA_sp, points_WA), zcol = list("Rank", NULL))
 
@@ -595,6 +615,12 @@ points_SF$rank_buff <- sf_env_values$layer
 points_LA$rank_buff <- la_env_values$layer
 
 
+
+# save all env/income shapefiles
+
+st_write(env_SF_sp, here("data", "income_maps", "SF_income_envhealth.shp"))
+st_write(env_WA_sp, here("data", "income_maps", "WA_income_envhealth.shp"))
+st_write(env_LA_sp, here("data", "income_maps", "LA_income_envhealth.shp"))
 
 ################################################################################
 
@@ -752,7 +778,10 @@ wa_income <- st_transform(tractsKP, st_crs(ndvi_kp))
 
 head(points_WA)
 
-
+# save points
+st_write(points_WA, here("data", "wa_camera_points.shp"))
+st_write(points_SF, here("data", "sf_camera_points.shp"))
+st_write(points_LA, here("data", "LA_camera_points.shp"))
 ################################################################################
 
 
@@ -798,27 +827,32 @@ autoplot(urb_pca, data = all_dat, colour = 'City', loadings = TRUE, scale = 0)
 
 ################################################################################
 # add back in the rest of our count data
-colnames(all_dat)
-colnames(all_sites)
 
 all_dat <- read_csv(here("data", "all_data_counts_covs_10-27-22.csv"))
+head(all_dat)
+head(all_sites)
 
 # merge only covariate columns
-all_sites_covs <- all_sites %>% merge(all_dat[,c(1,29:35)], by = "Site", 
-                    keep_all_x = TRUE)
-glimpse(all_dat)
+# all_sites_covs <- all_sites %>% merge(all_dat[,c(1,29:35)], by = c("Site", "season"), 
+  #                   keep_all_x = TRUE)
+
 
 # add back in sampling occasions 
-detections <- read_csv("data/raw_data_from_uwin/initial_data_yasmine.csv")
+detections <- read_csv("data/raw_data_from_uwin/initial_data_yasmine.csv") %>% 
+  group_by(Site)
+# detections <- detections[detections$J != 0, ]
 detections <- detections %>% dplyr::select(-Species) %>% distinct(Site, Season, .keep_all = TRUE)
 
-detections
-test <- merge(all_sites_covs, detections[,c("Site", "Season", "J")], by.x = c("Site", "season"),
-      by.y = c("Site", "Season"), keep_all_x = TRUE, keep_all_y = FALSE)
 
-test$J
+test <- merge(all_dat, detections[,c("Site", "Season", "J")], by.x = c("Site", "season"),
+      by.y = c("Site", "Season"), keep_all_x = TRUE, keep_all_y = FALSE) %>% 
+  distinct(Site, season, .keep_all = TRUE)  # %>%
+  # dplyr::filter("J" != 0)
+
+test$J[test$J == 0] <- 30
+View(test)
 # write csv to save all covs 
-write_csv(all_sites_covs, here("data", "all_data_counts_covs_10-27-22.csv"))
+write_csv(test, here("data", "all_data_counts_covs_10-30-22_J.csv"))
 
 # add in covariates to richness and diversity data 
 
