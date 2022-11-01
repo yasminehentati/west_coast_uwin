@@ -38,8 +38,6 @@ plotResiduals(simOut, all_dat$Environment2)
 # shannon diversity
 
 # universal model with random effects 
-mod1 <- glmmTMB(shannon.di ~  urb_pca + rank_buff + (1|City),
-                data=all_dat_veg, family = "gaussian")
 
 summary(mod1)
 

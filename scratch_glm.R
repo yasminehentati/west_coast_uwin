@@ -159,18 +159,6 @@ modtawa <- plot_model(zipmod,  type = "eff", title = "Tacoma, WA",
   scale_color_sjplot("circus") 
 
 ?ggpredict
-modlbca <- plot_model(zipmodlbca, title = "Long Beach, CA",
-                      rm.terms = "season [JU21]", axis.title = "",
-                      show.values = TRUE, show.p = TRUE) +   
-  scale_color_sjplot("circus") 
-modlbca + scale_y_log10(limits = c(0.1, 10))
-
-modpaca <- plot_model(glmmpaca, type = "pred", title = "Pasadena, CA",
-                      terms = "med_inc", axis.title = "",
-                      show.values = TRUE, show.p = TRUE) +   
-  scale_color_sjplot("circus")
-modpaca + scale_y_log10(limits = c(0.1, 10))
-
 
 
 pr1 <- ggpredict(modtawa)

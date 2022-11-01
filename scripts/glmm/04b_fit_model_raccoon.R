@@ -15,7 +15,7 @@
 # 56% 0s for the Raccoon - we'll try poisson and check for overdispersion 
 
 # universal model with random effects 
-mod1 <- glmmTMB(Raccoon ~ urb_pca + rank_buff + season + (1|City) +
+mod1 <- glmmTMB(Raccoon ~ huden2010 + rank_buff + med_inc + season + (1|City) +
                   (1|Site), 
                 data = all_dat, offset = log(J), family = "poisson")
 
@@ -29,7 +29,7 @@ sum(E2^2) / (N - p)
 # data is overdispersed 
 # use negative binomial instead
 
-mod2 <- glmmTMB(Raccoon ~  urb_pca + rank_buff + (1|season) + (1|City) +
+mod2 <- glmmTMB(Raccoon ~  urb_pca + rank_buff + med_inc + season + (1|City) +
                   (1|Site),  
                 data = all_dat, offset = log(J), family = "nbinom2")
 
@@ -51,9 +51,9 @@ sum(E2^2) / (N - p)
 dat2 <- na.omit(all_dat)
 
 # model didn't converge so lessened random effects 
-zipmod <- glmmTMB(Raccoon ~ urb_pca + rank_buff + season + (1|City) +
+zipmod <- glmmTMB(Raccoon ~ urb_pca + rank_buff + season + med_inc + (1|City) +
                     (1|Site),  
-                  data = all_dat, offset = log(J), ziformula=~1,
+                  data = all_dat,  ziformula=~1,
                   family="poisson")
 
 
@@ -95,16 +95,13 @@ plotResiduals(simOut, mod1$City)
 plotResiduals(simOut, all_dat$Environment2)
 
 
-
-
 ##################################################################################
 # plot 
 
-mydf <- ggpredict(zipmod, terms = "urb_pca")
+mydf <- ggpredict(mod2, terms = "urb_pca")
 
 ggplot(mydf, aes(x, predicted)) +
-  geom_line() +
-  xlim(-1,1) + 
+  geom_line()  + 
   labs(
     x ="urbanization_pca", y = "richness") + 
   geom_ribbon(aes(ymin = conf.low, ymax = conf.high), alpha = .1)
@@ -120,8 +117,7 @@ ggplot(mydf2, aes(x, predicted)) +
 
 
 mydf3 <- ggpredict(mod1, terms = c("med_inc"))
-confint(zipmod)
-?ggpredict
+
 ggplot(mydf3, aes(x, predicted)) +
   geom_line() +
   labs(

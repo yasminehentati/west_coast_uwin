@@ -91,7 +91,7 @@ head(cordat) # all below 0.7 - look ok
 # 39% 0s for the coyotes - we'll try poisson and check for overdispersion 
 
 # universal model with random effects 
-mod1 <- glmmTMB(Coyote ~ urb_pca + rank_buff + season + (1|City) +
+mod1 <- glmmTMB(Coyote ~ imp_surf + rank_buff + season + (1|City) +
                 (1|Site), 
                 data = all_dat, family = "poisson")
 summary(mod1)
@@ -128,9 +128,9 @@ sum(E2^2) / (N - p)
 
 dat2 <- na.omit(all_dat)
 
-zipmod <- glmmTMB(Coyote ~  urb_pca + rank_buff + (1|season) + (1|City) +
+zipmod <- glmmTMB(Coyote ~ urb_pca + med_inc + rank_buff + season + (1|City) +
                     (1|Site),
-                   data = all_dat,
+                   data = all_dat, offset = log(J),
                    ziformula=~1,
                    family="poisson")
 
@@ -139,7 +139,7 @@ E2 <- resid(zipmod, type = "pearson")
 N  <- nrow(all_dat)
 p  <- length(coef(zipmod))   
 sum(E2^2) / (N - p)
-
+confint(zipmod)
 #slightly overdispersed 
 # try ZINB 
 
@@ -331,8 +331,8 @@ sum(E2^2) / (N - p)
 
 dat2 <- na.omit(all_dat)
 
-zipmodlbca <- glmmTMB(Coyote ~ rank_buff + urb_pca + med_inc + season + (1|Site), 
-                  offset = log(J),
+zipmodlbca <- glmmTMB(Coyote ~ urb_pca + rank_buff + season + (1|Site), 
+                 #  offset = log(J),
                   data = all_dat_lbca, 
                   ziformula=~1,
                   family="poisson")
@@ -343,6 +343,16 @@ E2 <- resid(mod2, type = "pearson")
 N  <- nrow(all_dat_lbca)
 p  <- length(coef(mod2))   
 sum(E2^2) / (N - p)
+
+
+zipmodlbca <- glmmTMB(Coyote ~ rank_buff +  (1|Site), 
+                      offset = log(J),
+                      data = all_dat_lbca, 
+                      ziformula=~1,
+                      family="poisson")
+
+summary(zipmodlbca)
+
 
 
 
@@ -377,3 +387,31 @@ ggplot(mydf3, aes(x, predicted)) +
     x ="median income", y = "counts") + 
   geom_ribbon(aes(ymin = conf.low, ymax = conf.high), alpha = .1)
 summary(zipmod)
+
+
+modlbca <- plot_model(zipmodlbca, title = "Long Beach, CA",
+                      rm.terms = "season [JU21]", axis.title = "",
+                      show.values = TRUE, show.p = TRUE) +   
+  scale_color_sjplot("circus") 
+modlbca + scale_y_log10(limits = c(0.1, 10))
+
+modpaca <- plot_model(glmmpaca,  title = "Pasadena, CA",
+                      rm.terms = "season [JU21]", axis.title = "",
+                      show.values = TRUE, show.p = TRUE) +   
+  scale_color_sjplot("circus")
+
+modpaca
+
+
+modplot <- plot_model(zipmodtawa,  type = "eff", title = "Tacoma, WA",
+                      rm.terms = "season [JU21]", axis.title = "") +   
+  scale_color_sjplot("circus") 
+
+
+mods <- plot_models(list(zipmodlbca, glmmpaca, zipmodlbca), show.values = T, grid = TRUE, 
+                    rm.terms = "season [JA21, JU21]",
+                    title = c("Coefficient Plots")) 
+
+mods + 
+  scale_y_log10(limits = c(0.1, 10)) +  guides(color = guide_legend(reverse = TRUE))
+
